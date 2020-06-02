@@ -1,12 +1,14 @@
-﻿using System;
+﻿using System.Threading.Tasks;
 
 namespace cosmosdb_demo
 {
     class Program
     {
-        static void Main(string[] args)
+        ///use SDKv3
+        static async Task Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            var cosmosDbExample = new CosmosDbExample();
+            await cosmosDbExample.Run();
         }
     }
 }
