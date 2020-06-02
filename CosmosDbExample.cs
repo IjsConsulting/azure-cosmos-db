@@ -4,9 +4,16 @@ using Microsoft.Azure.Cosmos;
 
 namespace cosmosdb_demo
 {
+    //ref: 
+    //https://github.com/Azure/azure-cosmos-dotnet-v3/blob/master/Microsoft.Azure.Cosmos.Samples/Usage/DatabaseManagement/Program.cs
+    //
     public class CosmosDbExample
     {
         readonly string databaseId = "samples";
+        readonly string containerId = "container-samples";
+        readonly string partitionKey = "/activityId";
+
+        Database database = null;
 
         public async Task Run()
         {
@@ -31,6 +38,7 @@ namespace cosmosdb_demo
                 using (CosmosClient client = new CosmosClient(endpoint, authKey))
                 {
                     await CreateDatabase(client);
+                    await CreateContainer(client);
                 }
             }
             catch (CosmosException cre)
@@ -55,7 +63,7 @@ namespace cosmosdb_demo
             DatabaseResponse databaseResponse = await client.CreateDatabaseIfNotExistsAsync(databaseId, 10000);
 
             // A client side reference object that allows additional operations like ReadAsync
-            Database database = databaseResponse;
+            database = databaseResponse.Database;
 
             // The response from Azure Cosmos
             DatabaseProperties properties = databaseResponse;
@@ -93,5 +101,127 @@ namespace cosmosdb_demo
             await database.DeleteAsync();
             Console.WriteLine($"\n6. Database {database.Id} deleted.");
         }
+
+        private async Task CreateContainer(CosmosClient client)
+        {
+            await Setup(client);
+
+            Container simpleContainer = await CreateContainer();
+
+            await CreateContainerWithCustomIndexingPolicy();
+
+            await CreateContainerWithTtlExpiration();
+
+            await GetAndChangeContainerPerformance(simpleContainer);
+
+            await ReadContainerProperties();
+
+            await ListContainersInDatabase();
+
+            await DeleteContainer();
+        }
+
+        private async Task Setup(CosmosClient client)
+        {
+            database = await client.CreateDatabaseIfNotExistsAsync(databaseId);
+        }
+
+        private async Task<Container> CreateContainer()
+        {
+            // Set throughput to the minimum value of 400 RU/s
+            ContainerResponse simpleContainer = await database.CreateContainerIfNotExistsAsync(
+                id: containerId,
+                partitionKeyPath: partitionKey,
+                throughput: 400);
+
+            Console.WriteLine($"\n1.1. Created container :{simpleContainer.Container.Id}");
+            return simpleContainer;
+        }
+
+        private async Task CreateContainerWithCustomIndexingPolicy()
+        {
+            // Create a container with custom index policy (consistent indexing)
+            // We cover index policies in detail in IndexManagement sample project
+            ContainerProperties containerProperties = new ContainerProperties(
+                id: "SampleContainerWithCustomIndexPolicy",
+                partitionKeyPath: partitionKey);
+            containerProperties.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
+
+            Container containerWithConsistentIndexing = await database.CreateContainerIfNotExistsAsync(
+                containerProperties,
+                throughput: 400);
+
+            Console.WriteLine($"1.2. Created Container {containerWithConsistentIndexing.Id}, with custom index policy \n");
+
+            await containerWithConsistentIndexing.DeleteContainerAsync();
+        }
+
+        private async Task CreateContainerWithTtlExpiration()
+        {
+            ContainerProperties properties = new ContainerProperties
+                (id: "TtlExpiryContainer",
+                partitionKeyPath: partitionKey);
+            properties.DefaultTimeToLive = (int)TimeSpan.FromDays(1).TotalSeconds; //expire in 1 day
+
+            ContainerResponse ttlEnabledContainerResponse = await database.CreateContainerIfNotExistsAsync(
+                containerProperties: properties);
+            ContainerProperties returnedProperties = ttlEnabledContainerResponse;
+
+            Console.WriteLine($"\n1.3. Created Container \n{returnedProperties.Id} with TTL expiration of {returnedProperties.DefaultTimeToLive}");
+
+            await ttlEnabledContainerResponse.Container.DeleteContainerAsync();
+        }
+
+        private async Task GetAndChangeContainerPerformance(Container simpleContainer)
+        {
+            int? throughputResponse = await simpleContainer.ReadThroughputAsync();
+
+            Console.WriteLine($"\n2. Found throughput \n{throughputResponse}\nusing container's id \n{simpleContainer.Id}");
+
+            await simpleContainer.ReplaceThroughputAsync(500);
+
+            Console.WriteLine("\n3. Replaced throughput. Throughput is now 500.\n");
+
+            // Get the offer again after replace
+            throughputResponse = await simpleContainer.ReadThroughputAsync();
+
+            Console.WriteLine($"3. Found throughput \n{throughputResponse}\n using container's ResourceId {simpleContainer.Id}.\n");
+        }
+
+        private async Task ReadContainerProperties()
+        {
+
+            Container container = database.GetContainer(containerId);
+            ContainerProperties containerProperties = await container.ReadContainerAsync();
+
+            Console.WriteLine($"\n4. Found Container \n{containerProperties.Id}\n");
+        }
+
+        private async Task ListContainersInDatabase()
+        {
+            Console.WriteLine("\n5. Reading all CosmosContainer resources for a database");
+
+            FeedIterator<ContainerProperties> resultSetIterator = database.GetContainerQueryIterator<ContainerProperties>();
+            while (resultSetIterator.HasMoreResults)
+            {
+                foreach (ContainerProperties container in await resultSetIterator.ReadNextAsync())
+                {
+                    Console.WriteLine(container.Id);
+                }
+            }
+        }
+
+        private async Task DeleteContainer()
+        {
+            await database.GetContainer(containerId).DeleteContainerAsync();
+            Console.WriteLine("\n6. Deleted Container\n");
+        }
+    }
+
+    public class ToDoActivity
+    {
+        public string id = null;
+        public string activityId = null;
+        public string status = null;
     }
 }

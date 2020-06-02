@@ -5733,7 +5733,7 @@
   },
   "projectFileDependencyGroups": {
     ".NETCoreApp,Version=v3.1": [
-      "Microsoft.Azure.Cosmos >= *"
+      "Microsoft.Azure.Cosmos >= 3.9.1"
     ]
   },
   "packageFolders": {
@@ -5782,7 +5782,7 @@
         "dependencies": {
           "Microsoft.Azure.Cosmos": {
             "target": "Package",
-            "version": "[*, )"
+            "version": "[3.9.1, )"
           }
         },
         "imports": [

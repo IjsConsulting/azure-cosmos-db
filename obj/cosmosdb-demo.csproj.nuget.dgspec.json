@@ -45,7 +45,7 @@
           "dependencies": {
             "Microsoft.Azure.Cosmos": {
               "target": "Package",
-              "version": "[*, )"
+              "version": "[3.9.1, )"
             }
           },
           "imports": [
