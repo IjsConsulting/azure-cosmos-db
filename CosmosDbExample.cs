@@ -9,7 +9,8 @@ namespace cosmosdb_demo
 {
     public class CosmosDbExample
     {
-        // The Azure Cosmos DB endpoint for running this sample.        readonly string EndpointUri = "<your endpoint here>";
+        // The Azure Cosmos DB endpoint for running this sample.       #
+        readonly string EndpointUri = "<your endpoint here>";
         // The primary key for the Azure Cosmos account.
         readonly string PrimaryKey = "<your primary key>";
 
