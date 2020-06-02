@@ -1,227 +1,264 @@
 using System;
+using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
+using cosmosdb_demo.models;
 using Microsoft.Azure.Cosmos;
 
 namespace cosmosdb_demo
 {
-    //ref: 
-    //https://github.com/Azure/azure-cosmos-dotnet-v3/blob/master/Microsoft.Azure.Cosmos.Samples/Usage/DatabaseManagement/Program.cs
-    //
     public class CosmosDbExample
     {
-        readonly string databaseId = "samples";
-        readonly string containerId = "container-samples";
-        readonly string partitionKey = "/activityId";
 
-        Database database = null;
+        // ADD THIS PART TO YOUR CODE
 
-        public async Task Run()
+        // The Azure Cosmos DB endpoint for running this sample.
+        readonly string EndpointUri = "<your endpoint here>";
+        // The primary key for the Azure Cosmos account.
+        readonly string PrimaryKey = "<your primary key>";
+
+        // The Cosmos client instance
+        CosmosClient cosmosClient;
+
+        // The database we will create
+        Database database;
+
+        // The container we will create.
+        Container container;
+
+        // The name of the database and container we will create
+        string databaseId = "FamilyDatabase";
+        string containerId = "FamilyContainer";
+
+        public async Task GetStartedDemoAsync()
         {
+            // Create a new instance of the Cosmos Client
+            cosmosClient = new CosmosClient(EndpointUri, PrimaryKey);
+
+            //Create database
+            await CreateDatabaseAsync();
+
+            //create container
+            await CreateContainerAsync();
+
+            //add items to container.
+            await AddItemsToContainerAsync();
+
+            //Query items
+            await QueryItemsAsync();
+
+            //Replace an item in the container
+            await ReplaceFamilyItemAsync();
+
+            //delete an item from the container
+            await DeleteFamilyItemAsync();
+
+            //finally, delete database and clean up
+            await DeleteDatabaseAndCleanupAsync();
+        }
+
+        /// <summary>
+        /// Create the database if it does not exist
+        /// </summary>
+        private async Task CreateDatabaseAsync()
+        {
+            // Create a new database
+            database = await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId);
+
+            Console.WriteLine("Created Database: {0}\n", database.Id);
+        }
+
+        /// <summary>
+        /// Create the container if it does not exist. 
+        /// Specifiy "/LastName" as the partition key since we're storing family information, to ensure good distribution of requests and storage.
+        /// </summary>
+        /// <returns></returns>
+        private async Task CreateContainerAsync()
+        {
+            // Create a new container
+            container = await database.CreateContainerIfNotExistsAsync(containerId, "/LastName");
+
+            Console.WriteLine("Created Container: {0}\n", container.Id);
+        }
+
+        /// <summary>
+        /// Add Family items to the container
+        /// </summary>
+        private async Task AddItemsToContainerAsync()
+        {
+            // Create a family object for the Andersen family
+            Family andersenFamily = new Family
+            {
+                Id = "Andersen.1",
+                LastName = "Andersen",
+                Parents = new Parent[]
+                {
+                    new Parent { FirstName = "Thomas" },
+                    new Parent { FirstName = "Mary Kay" }
+                },
+                Children = new Child[]
+                {
+                    new Child
+                    {
+                        FirstName = "Henriette Thaulow",
+                        Gender = "female",
+                        Grade = 5,
+                        Pets = new Pet[]
+                        {
+                            new Pet { GivenName = "Fluffy" }
+                        }
+                    }
+                },
+                Address = new Address
+                {
+                    State = "WA",
+                    County = "King",
+                    City = "Seattle"
+                },
+                IsRegistered = false
+            };
+
             try
             {
+                // Read the item to see if it exists.  
+                ItemResponse<Family> andersenFamilyResponse = await container.ReadItemAsync<Family>(andersenFamily.Id, new PartitionKey(andersenFamily.LastName));
 
-                string endpoint = "EndPoint";
-                if (string.IsNullOrEmpty(endpoint))
-                {
-                    throw new ArgumentNullException("Please specify a valid endpoint in the appSettings.json");
-                }
-
-                string authKey = "AuthorizationKey";
-                if (string.IsNullOrEmpty(authKey) || string.Equals(authKey, "Super secret key"))
-                {
-                    throw new ArgumentException("Please specify a valid AuthorizationKey in the appSettings.json");
-                }
-
-                //Read the Cosmos endpointUrl and authorisationKeys from configuration
-                //These values are available from the Azure Management Portal on the Cosmos Account Blade under "Keys"
-                //NB > Keep these values in a safe & secure location. Together they provide Administrative access to your Cosmos account
-                using (CosmosClient client = new CosmosClient(endpoint, authKey))
-                {
-                    await CreateDatabase(client);
-                    await CreateContainer(client);
-                }
+                Console.WriteLine("Item in database with id: {0} already exists\n", andersenFamilyResponse.Resource.Id);
             }
-            catch (CosmosException cre)
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
-                Console.WriteLine(cre.ToString());
-            }
-            catch (Exception e)
-            {
-                Exception baseException = e.GetBaseException();
-                Console.WriteLine("Error: {0}, Message: {1}", e.Message, baseException.Message);
-            }
-            finally
-            {
-                Console.WriteLine("End of demo, press any key to exit.");
-                Console.ReadKey();
-            }
-        }
+                // Create an item in the container representing the Andersen family. Note we provide the value of the partition key for this item, which is "Andersen"
+                ItemResponse<Family> andersenFamilyResponse = await container.CreateItemAsync<Family>(andersenFamily, new PartitionKey(andersenFamily.LastName));
 
-        private async Task CreateDatabase(CosmosClient client)
-        {
-            // An object containing relevant information about the response
-            DatabaseResponse databaseResponse = await client.CreateDatabaseIfNotExistsAsync(databaseId, 10000);
-
-            // A client side reference object that allows additional operations like ReadAsync
-            database = databaseResponse.Database;
-
-            // The response from Azure Cosmos
-            DatabaseProperties properties = databaseResponse;
-
-            Console.WriteLine($"\n1. Create a database resource with id: {properties.Id} and last modified time stamp: {properties.LastModified}");
-            Console.WriteLine($"\n2. Create a database resource request charge: {databaseResponse.RequestCharge} and Activity Id: {databaseResponse.ActivityId}");
-
-            // Read the database from Azure Cosmos
-            DatabaseResponse readResponse = await database.ReadAsync();
-            Console.WriteLine($"\n3. Read a database: {readResponse.Resource.Id}");
-
-            await readResponse.Database.CreateContainerAsync("testContainer", "/pk");
-
-            // Get the current throughput for the database
-            int? throughputResponse = await database.ReadThroughputAsync();
-            if (throughputResponse.HasValue)
-            {
-                Console.WriteLine($"\n4. Read a database throughput: {throughputResponse}");
-
-                // Update the current throughput for the database
-                await database.ReplaceThroughputAsync(11000);
+                // Note that after creating the item, we can access the body of the item with the Resource property off the ItemResponse. We can also access the RequestCharge property to see the amount of RUs consumed on this request.
+                Console.WriteLine("Created item in database with id: {0} Operation consumed {1} RUs.\n", andersenFamilyResponse.Resource.Id, andersenFamilyResponse.RequestCharge);
             }
 
-            Console.WriteLine("\n5. Reading all databases resources for an account");
-            FeedIterator<DatabaseProperties> iterator = client.GetDatabaseQueryIterator<DatabaseProperties>();
-            do
+            // Create a family object for the Wakefield family
+            Family wakefieldFamily = new Family
             {
-                foreach (DatabaseProperties db in await iterator.ReadNextAsync())
+                Id = "Wakefield.7",
+                LastName = "Wakefield",
+                Parents = new Parent[]
                 {
-                    Console.WriteLine(db.Id);
-                }
-            } while (iterator.HasMoreResults);
+                    new Parent { FamilyName = "Wakefield", FirstName = "Robin" },
+                    new Parent { FamilyName = "Miller", FirstName = "Ben" }
+                },
+                Children = new Child[]
+                {
+                    new Child
+                    {
+                        FamilyName = "Merriam",
+                        FirstName = "Jesse",
+                        Gender = "female",
+                        Grade = 8,
+                        Pets = new Pet[]
+                        {
+                            new Pet { GivenName = "Goofy" },
+                            new Pet { GivenName = "Shadow" }
+                        }
+                    },
+                    new Child
+                    {
+                        FamilyName = "Miller",
+                        FirstName = "Lisa",
+                        Gender = "female",
+                        Grade = 1
+                    }
+                },
+                Address = new Address { State = "NY", County = "Manhattan", City = "NY" },
+                IsRegistered = true
+            };
 
-            // Delete the database from Azure Cosmos.
-            await database.DeleteAsync();
-            Console.WriteLine($"\n6. Database {database.Id} deleted.");
-        }
-
-        private async Task CreateContainer(CosmosClient client)
-        {
-            await Setup(client);
-
-            Container simpleContainer = await CreateContainer();
-
-            await CreateContainerWithCustomIndexingPolicy();
-
-            await CreateContainerWithTtlExpiration();
-
-            await GetAndChangeContainerPerformance(simpleContainer);
-
-            await ReadContainerProperties();
-
-            await ListContainersInDatabase();
-
-            await DeleteContainer();
-        }
-
-        private async Task Setup(CosmosClient client)
-        {
-            database = await client.CreateDatabaseIfNotExistsAsync(databaseId);
-        }
-
-        private async Task<Container> CreateContainer()
-        {
-            // Set throughput to the minimum value of 400 RU/s
-            ContainerResponse simpleContainer = await database.CreateContainerIfNotExistsAsync(
-                id: containerId,
-                partitionKeyPath: partitionKey,
-                throughput: 400);
-
-            Console.WriteLine($"\n1.1. Created container :{simpleContainer.Container.Id}");
-            return simpleContainer;
-        }
-
-        private async Task CreateContainerWithCustomIndexingPolicy()
-        {
-            // Create a container with custom index policy (consistent indexing)
-            // We cover index policies in detail in IndexManagement sample project
-            ContainerProperties containerProperties = new ContainerProperties(
-                id: "SampleContainerWithCustomIndexPolicy",
-                partitionKeyPath: partitionKey);
-            containerProperties.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
-
-            Container containerWithConsistentIndexing = await database.CreateContainerIfNotExistsAsync(
-                containerProperties,
-                throughput: 400);
-
-            Console.WriteLine($"1.2. Created Container {containerWithConsistentIndexing.Id}, with custom index policy \n");
-
-            await containerWithConsistentIndexing.DeleteContainerAsync();
-        }
-
-        private async Task CreateContainerWithTtlExpiration()
-        {
-            ContainerProperties properties = new ContainerProperties
-                (id: "TtlExpiryContainer",
-                partitionKeyPath: partitionKey);
-            properties.DefaultTimeToLive = (int)TimeSpan.FromDays(1).TotalSeconds; //expire in 1 day
-
-            ContainerResponse ttlEnabledContainerResponse = await database.CreateContainerIfNotExistsAsync(
-                containerProperties: properties);
-            ContainerProperties returnedProperties = ttlEnabledContainerResponse;
-
-            Console.WriteLine($"\n1.3. Created Container \n{returnedProperties.Id} with TTL expiration of {returnedProperties.DefaultTimeToLive}");
-
-            await ttlEnabledContainerResponse.Container.DeleteContainerAsync();
-        }
-
-        private async Task GetAndChangeContainerPerformance(Container simpleContainer)
-        {
-            int? throughputResponse = await simpleContainer.ReadThroughputAsync();
-
-            Console.WriteLine($"\n2. Found throughput \n{throughputResponse}\nusing container's id \n{simpleContainer.Id}");
-
-            await simpleContainer.ReplaceThroughputAsync(500);
-
-            Console.WriteLine("\n3. Replaced throughput. Throughput is now 500.\n");
-
-            // Get the offer again after replace
-            throughputResponse = await simpleContainer.ReadThroughputAsync();
-
-            Console.WriteLine($"3. Found throughput \n{throughputResponse}\n using container's ResourceId {simpleContainer.Id}.\n");
-        }
-
-        private async Task ReadContainerProperties()
-        {
-
-            Container container = database.GetContainer(containerId);
-            ContainerProperties containerProperties = await container.ReadContainerAsync();
-
-            Console.WriteLine($"\n4. Found Container \n{containerProperties.Id}\n");
-        }
-
-        private async Task ListContainersInDatabase()
-        {
-            Console.WriteLine("\n5. Reading all CosmosContainer resources for a database");
-
-            FeedIterator<ContainerProperties> resultSetIterator = database.GetContainerQueryIterator<ContainerProperties>();
-            while (resultSetIterator.HasMoreResults)
+            try
             {
-                foreach (ContainerProperties container in await resultSetIterator.ReadNextAsync())
+                // Read the item to see if it exists
+                ItemResponse<Family> wakefieldFamilyResponse = await container.ReadItemAsync<Family>(wakefieldFamily.Id, new PartitionKey(wakefieldFamily.LastName));
+                Console.WriteLine("Item in database with id: {0} already exists\n", wakefieldFamilyResponse.Resource.Id);
+            }
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Create an item in the container representing the Wakefield family. Note we provide the value of the partition key for this item, which is "Wakefield"
+                ItemResponse<Family> wakefieldFamilyResponse = await container.CreateItemAsync<Family>(wakefieldFamily, new PartitionKey(wakefieldFamily.LastName));
+
+                // Note that after creating the item, we can access the body of the item with the Resource property off the ItemResponse. We can also access the RequestCharge property to see the amount of RUs consumed on this request.
+                Console.WriteLine("Created item in database with id: {0} Operation consumed {1} RUs.\n", wakefieldFamilyResponse.Resource.Id, wakefieldFamilyResponse.RequestCharge);
+            }
+        }
+
+        /// <summary>
+        /// Run a query (using Azure Cosmos DB SQL syntax) against the container
+        /// </summary>
+        private async Task QueryItemsAsync()
+        {
+            var sqlQueryText = "SELECT * FROM c WHERE c.LastName = 'Andersen'";
+
+            Console.WriteLine("Running query: {0}\n", sqlQueryText);
+
+            QueryDefinition queryDefinition = new QueryDefinition(sqlQueryText);
+
+            FeedIterator<Family> queryResultSetIterator = container.GetItemQueryIterator<Family>(queryDefinition);
+
+            List<Family> families = new List<Family>();
+
+            while (queryResultSetIterator.HasMoreResults)
+            {
+                FeedResponse<Family> currentResultSet = await queryResultSetIterator.ReadNextAsync();
+                foreach (Family family in currentResultSet)
                 {
-                    Console.WriteLine(container.Id);
+                    families.Add(family);
+                    Console.WriteLine("\tRead {0}\n", family);
                 }
             }
         }
 
-        private async Task DeleteContainer()
+        /// <summary>
+        /// Replace an item in the container
+        /// </summary>
+        private async Task ReplaceFamilyItemAsync()
         {
-            await database.GetContainer(containerId).DeleteContainerAsync();
-            Console.WriteLine("\n6. Deleted Container\n");
-        }
-    }
+            ItemResponse<Family> wakefieldFamilyResponse = await container.ReadItemAsync<Family>("Wakefield.7", new PartitionKey("Wakefield"));
 
-    public class ToDoActivity
-    {
-        public string id = null;
-        public string activityId = null;
-        public string status = null;
+            var itemBody = wakefieldFamilyResponse.Resource;
+
+            // update registration status from false to true
+            itemBody.IsRegistered = true;
+            // update grade of child
+            itemBody.Children[0].Grade = 6;
+
+            // replace the item with the updated content
+            wakefieldFamilyResponse = await container.ReplaceItemAsync<Family>(itemBody, itemBody.Id, new PartitionKey(itemBody.LastName));
+
+            Console.WriteLine("Updated Family [{0},{1}].\n \tBody is now: {2}\n", itemBody.LastName, itemBody.Id, wakefieldFamilyResponse.Resource);
+        }
+
+        /// <summary>
+        /// Delete an item in the container
+        /// </summary>
+        private async Task DeleteFamilyItemAsync()
+        {
+            var partitionKeyValue = "Wakefield";
+            var familyId = "Wakefield.7";
+
+            // Delete an item. Note we must provide the partition key value and id of the item to delete
+            ItemResponse<Family> wakefieldFamilyResponse = await container.DeleteItemAsync<Family>(familyId, new PartitionKey(partitionKeyValue));
+
+            Console.WriteLine("Deleted Family [{0},{1}]\n", partitionKeyValue, familyId);
+        }
+
+        /// <summary>
+        /// Delete the database and dispose of the Cosmos Client instance
+        /// </summary>
+        private async Task DeleteDatabaseAndCleanupAsync()
+        {
+            DatabaseResponse databaseResourceResponse = await database.DeleteAsync();
+            // Also valid: await this.cosmosClient.Databases["FamilyDatabase"].DeleteAsync();
+
+            Console.WriteLine("Deleted Database: {0}\n", databaseId);
+
+            //Dispose of CosmosClient
+            cosmosClient.Dispose();
+        }
+
     }
 }

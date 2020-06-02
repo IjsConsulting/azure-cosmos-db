@@ -8,7 +8,7 @@ namespace cosmosdb_demo
         static async Task Main(string[] args)
         {
             var cosmosDbExample = new CosmosDbExample();
-            await cosmosDbExample.Run();
+            await cosmosDbExample.GetStartedDemoAsync();
         }
     }
 }
