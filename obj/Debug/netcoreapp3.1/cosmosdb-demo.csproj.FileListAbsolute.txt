@@ -1,0 +1,13 @@
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\bin\Debug\netcoreapp3.1\cosmosdb-demo.exe
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\bin\Debug\netcoreapp3.1\cosmosdb-demo.deps.json
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\bin\Debug\netcoreapp3.1\cosmosdb-demo.runtimeconfig.json
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\bin\Debug\netcoreapp3.1\cosmosdb-demo.runtimeconfig.dev.json
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\bin\Debug\netcoreapp3.1\cosmosdb-demo.dll
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\bin\Debug\netcoreapp3.1\cosmosdb-demo.pdb
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\obj\Debug\netcoreapp3.1\cosmosdb-demo.csprojAssemblyReference.cache
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\obj\Debug\netcoreapp3.1\cosmosdb-demo.AssemblyInfoInputs.cache
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\obj\Debug\netcoreapp3.1\cosmosdb-demo.AssemblyInfo.cs
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\obj\Debug\netcoreapp3.1\cosmosdb-demo.csproj.CoreCompileInputs.cache
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\obj\Debug\netcoreapp3.1\cosmosdb-demo.dll
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\obj\Debug\netcoreapp3.1\cosmosdb-demo.pdb
+C:\Working\az204\azire-cosmosdb\cosmosdb-demo\obj\Debug\netcoreapp3.1\cosmosdb-demo.genruntimeconfig.cache
